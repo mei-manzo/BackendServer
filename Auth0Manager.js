@@ -1,110 +1,84 @@
-const axios = require('axios');
-const ManagementClient = require('auth0').ManagementClient;
+var ManagementClient = require('auth0').ManagementClient;
+var auth0 = new ManagementClient({
+    domain: 'melandalin.us.auth0.com',
+    clientId: 'H5NA6UmUpuvdAFYqTyo9cjQz28nvhSvQ',
+    clientSecret: 'Zch6ceM8me9nThaEuo53b0H1BU6sEgw3EOOMJxFVb8kulp63lvHcLeG9xTcGkr0O',
+    scope: 'read:users update:users'
+});
 
-/**
- * The module to interact with the Auth0Management API
- *
- * Requirements:
- *  - Have an Auth0 account and an account name.
- *  - Have a management API: https://manage.auth0.com/dashboard/us/{DOMAIN}/apis
- *
- * How this works:
- *  1. Requests an access token using client_id and client_secret
- *  2. Uses the access token to create a new ManagementClient
- *  3. Use the ManagementClient to interact with the API:
- *     https://auth0.github.io/node-auth0/module-management.ManagementClient.html
- *
- * Example usage to get a client:
- *
- * const Auth0Manager = require('./Auth0Manager');
- * Auth0Manager
- *  .init()
- *  .then(() => Auth0Manager.getClient())
- *  .then(client => res.json(client))
- *  .catch(err => res.json({ message: 'There was an error!', ...err }));
- */
 
-module.exports = (function () {
-    let managementClient;
+//access token code
+var AuthenticationClient = require('auth0').AuthenticationClient;
 
-    return {
-        init,
-        getClient,
-        updateClient
+var auth0 = new AuthenticationClient({
+    domain: 'melandalin.us.auth0.com',
+    clientId: 'H5NA6UmUpuvdAFYqTyo9cjQz28nvhSvQ', //noninteractive client id
+    clientSecret: 'Zch6ceM8me9nThaEuo53b0H1BU6sEgw3EOOMJxFVb8kulp63lvHcLeG9xTcGkr0O'
+});
+
+//defining localStorage
+var LocalStorage = require('node-localstorage').LocalStorage, //here we are defining the localstorage variable
+localStorage = new LocalStorage('./scratch');
+
+
+auth0.clientCredentialsGrant(
+    {
+        audience: 'https://melandalin.us.auth0.com/api/v2/',
+        scope:  'read:users update:users'
+    },
+    function(err, response) {
+        if (err) {
+      // Handle error.
+        }
+        console.log(response.access_token); //this seems to output the bearer access token for our data!
+        var myToken = (response.access_token);
+        localStorage.setItem("myToken", myToken);
+        localStorage.setItem("first", "name");
+    }
+);
+
+
+
+//////GENERATE RULES BY CALLING MANAGEMENT API BELOW
+var request = require("request"); //requests bearer management API token, should work
+
+var options = { method: 'POST',
+    url: 'https://melandalin.us.auth0.com/oauth/token',
+    headers: { 'content-type': 'application/json' },
+    body: '{"client_id":"uejGHfjRbCHNHgrQCBruC7L6CoknpcGA","client_secret":"7FYXeYhIA_snqdH7x9NVbgYrxsI5tt93z3ZY09BISsRY1cf9tW2COxIUiwy0X1iQ","audience":"https://melandalin.us.auth0.com/api/v2/","grant_type":"client_credentials"}' };
+
+    request(options, function (error, response, body) {
+    if (error) throw new Error(error);
+
+    // console.log(body);
+
+    });
+
+
+
+//grabs automatic management api token and applies it to data retrieval
+
+var thisToken = localStorage.getItem("myToken");
+var myToken = thisToken;
+
+
+var axios = require("axios").default;
+
+
+var options = {
+    method: 'GET',
+    url: 'https://melandalin.us.auth0.com/api/v2/clients', //Bearer token allows for Managment API access, manual works
+    headers: {'content-type': 'application/json', authorization: 'Bearer '+ myToken}, //add a variable to swap in a new token
+    scope: 'read:rules',
     };
 
-    /**
-     * Create a management client
-     */
-    function init() {
-        return getToken()
-            .then(data => data.access_token)
-            .then(token => {
-                const managementClient = new ManagementClient({
-                    domain: `${process.env.CLIENT_DOMAIN}`,
-                    token,
-                    audience: `https://${process.env.CLIENT_DOMAIN}/api/v2/`
-                });
+console.log("...");
+console.log("...");
 
-                // set it so we can use it in our other methods
-                this.managementClient = managementClient;
-                return true;
-            })
-            .catch(err => err);
-    }
-
-    /**
-     * Get an access token from the Auth0 API
-     * We will use this access token to connect to the management API
-     * To get a token, we need to provide client_id and client_secret
-     * Both of these can be found in the APIs section of Auth0 dashboard
-     */
-    function getToken() {
-        // get the info we need
-        const clientId = process.env.CLIENT_ID;
-        const clientSecret = process.env.CLIENT_SECRET;
-        const url = `https://${process.env.CLIENT_DOMAIN}/oauth/token`;
-
-        // make the call to the API via POST
-        return axios
-            .post(url, {
-                client_id: clientId,
-                client_secret: clientSecret,
-                grant_type: 'client_credentials',
-                audience: `https://${process.env.CLIENT_DOMAIN}/api/v2/`
-            })
-            .then(res => res.data)
-            .catch(err => err);
-    }
-
-    /**
-     * Make a call to the Management API to get all the data for a certain client
-     * All the things that are available in the dashboard can be accessed here
-     * @param string clientId
-     */
-    function getClient(clientId = null) {
-        if (!clientId) clientId = process.env.CLIENT_ID;
-
-        return this.managementClient
-            .getClient({ client_id: clientId })
-            .then(client => client)
-            .catch(err => err);
-    }
-
-    /**
-     * Take data and update the Auth0Client
-     * This can be used to update the entire client via API instead of in the dashboard
-     * Very helpful if moving settings from local to a production environment
-     *
-     * @param {Object} data     The data that will overwrite anything in our dashboard
-     * @param {String} clientId The client that we want to update
-     */
-    function updateClient(data, clientId = null) {
-        if (!clientId) clientId = process.env.CLIENT_ID;
-
-        return this.managementClient
-            .updateClient({ client_id: clientId }, data)
-            .then(client => client)
-            .catch(err => err);
-    }
-})();
+axios.request(options).then(function (response) {
+    console.log(response.data);
+    userRules = response.data;
+    localStorage.setItem("rules",JSON.stringify(userRules));//saving rules to scratch
+    }).catch(function (error) {
+    console.error(error);
+});

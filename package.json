@@ -17,9 +17,12 @@
   },
   "homepage": "https://github.com/SarahJay55/auth0-management-api#readme",
   "dependencies": {
-    "auth0": "^2.18.0",
+    "auth0": "^2.36.2",
     "axios": "^0.19.0",
     "dotenv": "^8.0.0",
-    "file-system": "^2.2.2"
+    "file-system": "^2.2.2",
+    "node-localstorage": "^2.2.1",
+    "request": "^2.88.2",
+    "response": "^0.18.0"
   }
 }
